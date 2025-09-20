@@ -70,7 +70,7 @@ def send_secret_santa_emails(
         msg["To"] = to_addr
 
         body = (
-            f"Hey {giver},\n\n"
+            f"Hey {giver.capitalize()},\n\n"
             f"De kerstman heeft me verteld dat jij dit jaar voor {receiver.capitalize()} iets leuks mag uitkiezen!\n\n"
             "Wees origineel en mondje toe hé! 😉\n\n"
             "Groetjes,\n"
