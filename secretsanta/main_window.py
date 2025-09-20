@@ -1,5 +1,8 @@
 import sys
 import os
+import json
+from datetime import datetime
+from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -19,6 +22,47 @@ def _is_super_secret_mode() -> bool:
     result = os.getenv("SuperSecret", "").lower() in {"true", "1", "yes"}
     print("Super secret mode is active." if result else "Super secret mode is not active.")
     return result
+
+# Persistent history utilities
+HISTORY_DIR = Path(__file__).resolve().parent.parent / "output"
+HISTORY_DIR.mkdir(exist_ok=True)
+
+HISTORY_INDEX_FILE = HISTORY_DIR / "history_index.json"
+
+
+def _load_history_pairs() -> set[tuple[str, str]]:
+    pairs: set[tuple[str, str]] = set()
+    if HISTORY_INDEX_FILE.exists():
+        try:
+            data = json.loads(HISTORY_INDEX_FILE.read_text(encoding="utf-8"))
+            for rec in data.get("assignments", []):
+                for giver, receiver in rec.get("pairs", []):
+                    pairs.add((giver, receiver))
+        except Exception as e:
+            print(f"Failed to parse history index: {e}")
+    return pairs
+
+
+def _append_history(assignment: dict[str, str]):
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # Write detailed file
+    detail_path = HISTORY_DIR / f"{timestamp}.secret"
+    lines = ["# Secret Santa assignment", f"# Generated: {timestamp}", ""]
+    for giver, receiver in assignment.items():
+        lines.append(f"{giver} -> {receiver}")
+    detail_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # Update index
+    index = {"assignments": []}
+    if HISTORY_INDEX_FILE.exists():
+        try:
+            index = json.loads(HISTORY_INDEX_FILE.read_text(encoding="utf-8")) or index
+        except Exception as e:
+            print(f"Failed to read existing index: {e}")
+    index.setdefault("assignments", []).append({
+        "timestamp": timestamp,
+        "pairs": list(assignment.items())
+    })
+    HISTORY_INDEX_FILE.write_text(json.dumps(index, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 class MainWindow(QMainWindow):
@@ -88,6 +132,7 @@ class MainWindow(QMainWindow):
         # State
         self._last_assignment = None  # type: dict[str, str] | None
         self._last_emails = None      # type: dict[str, str] | None
+        self._history_pairs = _load_history_pairs()
 
     # ---- Slots ----
     def _on_build_list(self):
@@ -116,30 +161,30 @@ class MainWindow(QMainWindow):
         except ValueError as e:
             QMessageBox.warning(self, "Ongeldige invoer", str(e))
             return
-
-        assignment = find_secret_santa_assignment(people, partner_of)
+        # Try with history constraints
+        assignment = find_secret_santa_assignment(people, partner_of, forbidden_pairs=self._history_pairs)
         if assignment is None:
             QMessageBox.critical(
                 self,
                 "Geen geldige verdeling",
-                "Er kon geen geldige Secret Santa-verdeling gevonden worden met de huidige namen.\n\n"
-                "Tip: voeg extra personen toe of verander de samenstelling."
+                "Er kon geen geldige Secret Santa-verdeling gevonden worden met de huidige namen (rekening houdend met eerdere jaren).\n\n"
+                "Tip: voeg extra personen toe of verander de samenstelling, of wis history als dat acceptabel is."
             )
             self._last_assignment = None
             self.send_btn.setEnabled(False)
             return
-
         self._last_assignment = assignment
         self._last_emails = emails
+        _append_history(assignment)
+        # Update in-memory forbidden pairs for subsequent draws this session
+        for pair in assignment.items():
+            self._history_pairs.add(pair)
         if _is_super_secret_mode():
-            print("Super secret mode active: assignment not shown in UI.")
-            # Do not reveal assignments; just allow sending
             QMessageBox.information(
                 self,
                 "Super secret mode",
-                "De verdeling is gemaakt maar wordt niet getoond. Klik 'Send emails' om de e-mails te versturen."
+                "De verdeling is gemaakt en opgeslagen, maar wordt niet getoond. Klik 'Send emails' om de e-mails te versturen."
             )
-            # Ensure table stays blank (already cleared) and hidden
             self.results_table.setRowCount(0)
             self.send_btn.setEnabled(True)
         else:

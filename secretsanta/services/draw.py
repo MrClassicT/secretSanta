@@ -1,17 +1,19 @@
 import random
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set, Tuple
 
 
 def find_secret_santa_assignment(
     people: List[str],
     partner_of: Dict[str, Optional[str]],
-    max_tries: int = 200
+    max_tries: int = 200,
+    forbidden_pairs: Optional[Set[Tuple[str, str]]] = None,
 ) -> Optional[Dict[str, str]]:
     """
     Backtracking with light randomization.
     Constraints:
       - No self-assignments.
       - No giving to your partner (if any).
+      - No (giver, receiver) in forbidden_pairs (historical assignments) if provided.
     Returns mapping giver -> receiver, or None if impossible.
 
     Quick impossibility: exactly two people who are a couple.
@@ -44,6 +46,8 @@ def find_secret_santa_assignment(
             candidates = [r for r in base_candidates[giver] if r in receivers_available]
             random.shuffle(candidates)
             for r in candidates:
+                if forbidden_pairs and (giver, r) in forbidden_pairs:
+                    continue
                 assignment[giver] = r
                 receivers_available.remove(r)
                 if backtrack(i + 1):
