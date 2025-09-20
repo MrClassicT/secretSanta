@@ -161,7 +161,18 @@ class MainWindow(QMainWindow):
         except ValueError as e:
             QMessageBox.warning(self, "Ongeldige invoer", str(e))
             return
-        # Try with history constraints
+        emails_enabled = len(emails) > 0
+        secret_mode = _is_super_secret_mode()
+        if secret_mode and not emails_enabled:
+            # Secret mode cannot function without emails; fall back to normal mode.
+            QMessageBox.information(
+                self,
+                "Secret mode uitgeschakeld",
+                "Secret mode vereist dat alle e-mailadressen ingevuld zijn. Omdat er geen e-mails zijn, wordt de verdeling getoond."
+            )
+            secret_mode = False
+            if self.results_table.isHidden():
+                self.results_table.show()
         assignment = find_secret_santa_assignment(people, partner_of, forbidden_pairs=self._history_pairs)
         if assignment is None:
             QMessageBox.critical(
@@ -174,19 +185,18 @@ class MainWindow(QMainWindow):
             self.send_btn.setEnabled(False)
             return
         self._last_assignment = assignment
-        self._last_emails = emails
+        self._last_emails = emails if emails_enabled else None
         _append_history(assignment)
-        # Update in-memory forbidden pairs for subsequent draws this session
         for pair in assignment.items():
             self._history_pairs.add(pair)
-        if _is_super_secret_mode():
+        if secret_mode:
             QMessageBox.information(
                 self,
                 "Super secret mode",
                 "De verdeling is gemaakt en opgeslagen, maar wordt niet getoond. Klik 'Send emails' om de e-mails te versturen."
             )
             self.results_table.setRowCount(0)
-            self.send_btn.setEnabled(True)
+            self.send_btn.setEnabled(True)  # emails_enabled must be True here
         else:
             self.results_table.setRowCount(len(assignment))
             for row, giver in enumerate(people):
@@ -194,7 +204,7 @@ class MainWindow(QMainWindow):
                 self.results_table.setItem(row, 1, QTableWidgetItem(assignment[giver]))
             self.results_table.resizeColumnsToContents()
             self.results_table.horizontalHeader().setStretchLastSection(True)
-            self.send_btn.setEnabled(True)
+            self.send_btn.setEnabled(emails_enabled)
 
     def _on_send_emails(self):
         if not self._last_assignment or not self._last_emails:
