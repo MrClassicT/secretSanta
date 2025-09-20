@@ -53,13 +53,13 @@ def collect_participants_or_raise(
         b_name, b_email = _read_pair((b_name_e, b_email_e))
 
         if not a_name or not b_name:
-            raise ValueError("Vul alle namen van koppels in (geen lege velden).")
+            raise ValueError("Complete all names of couples (no empty fields).")
         if a_name == b_name:
-            raise ValueError("Namen binnen een koppel moeten verschillend zijn.")
+            raise ValueError("Names should be unique.")
 
         if any_email_entered:
             if not (a_email and EMAIL_RE.match(a_email)) or not (b_email and EMAIL_RE.match(b_email)):
-                raise ValueError("Gebruik geldige e-mailadressen voor elk koppel (of laat alle velden leeg om zonder e-mail verder te gaan).")
+                raise ValueError("Use valid email addresses for each couple (or leave all fields blank to proceed without email).")
             emails[a_name] = a_email
             emails[b_name] = b_email
 
@@ -71,18 +71,18 @@ def collect_participants_or_raise(
     for s_name_e, s_email_e in single_rows:
         s_name, s_email = _read_pair((s_name_e, s_email_e))
         if not s_name:
-            raise ValueError("Vul alle namen van aparte personen in (geen lege velden).")
+            raise ValueError("Complete all names of singles (no empty fields).")
         if any_email_entered:
             if not (s_email and EMAIL_RE.match(s_email)):
-                raise ValueError(f"Gebruik een geldig e-mailadres voor single “{s_name or '—'}” (of laat alle e-mails leeg).")
+                raise ValueError(f"Use a valid email address for single “{s_name or '—'}” (or leave all emails blank).")
             emails[s_name] = s_email
         people.append(s_name)
         partner_of[s_name] = None
 
     # Duplicates & count
     if len(set(people)) != len(people):
-        raise ValueError("Elke naam moet uniek zijn (dubbele namen gevonden).")
+        raise ValueError("Each name must be unique (duplicates found).")
     if len(people) < 2:
-        raise ValueError("Je hebt minstens 2 personen nodig.")
+        raise ValueError("At least 2 people are required.")
 
     return people, partner_of, emails

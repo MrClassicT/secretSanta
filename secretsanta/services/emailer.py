@@ -33,7 +33,7 @@ def load_smtp_settings_from_env() -> SMTPSettings:
         ("SMTP_PASSWORD", password), ("SMTP_FROM", sender)
     ] if not v]
     if missing:
-        raise RuntimeError(f"Ontbrekende .env variabelen: {', '.join(missing)}")
+        raise RuntimeError(f"Missing .env variables: {', '.join(missing)}")
 
     return SMTPSettings(
         host=host, port=port, username=username, password=password,
@@ -61,7 +61,7 @@ def send_secret_santa_emails(
     messages: List[EmailMessage] = []
     for giver, receiver in assignment.items():
         if giver not in emails:
-            raise ValueError(f"Geen e-mail gevonden voor '{giver}'.")
+            raise ValueError(f"No email address found for '{giver}'.")
         to_addr = emails[giver]
 
         msg = EmailMessage()
@@ -71,10 +71,10 @@ def send_secret_santa_emails(
 
         body = (
             f"Hey {giver.capitalize()},\n\n"
-            f"De kerstman heeft me verteld dat jij dit jaar voor {receiver.capitalize()} iets leuks mag uitkiezen!\n\n"
-            "Wees origineel en mondje toe hé! 😉\n\n"
-            "Groetjes,\n"
-            "De Super Secret Santa Elven Commissie"
+            f"Santa told me that you get to choose something nice for {receiver.capitalize()} this year!\n\n"
+            "Be original and keep it a secret! 😉\n\n"
+            "Best regards,\n"
+            "The Super Secret Santa Elfs Committee"
         )
         msg.set_content(body)
         messages.append(msg)

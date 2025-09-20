@@ -10,8 +10,8 @@ class NamesPanel(QWidget):
     Scrollable area with inputs per person:
       - name (QLineEdit)
       - email (QLineEdit)
-    Couples are shown as two person-rows inside a "Koppels" group.
-    Singles are shown inside "Aparte personen".
+    Couples are shown as two person-rows inside a "Couples" group.
+    Singles are shown inside "Singles".
     Exposes:
       - couple_rows: List[List[Tuple[name_edit, email_edit]]]  (each inner list length=2)
       - single_rows: List[Tuple[name_edit, email_edit]]
@@ -49,29 +49,29 @@ class NamesPanel(QWidget):
         name = QLineEdit()
         name.setPlaceholderText(name_ph)
         email = QLineEdit()
-        email.setPlaceholderText("email@adres.be")
-        g.addWidget(QLabel("Naam"), 0, 0)
+        email.setPlaceholderText("email@address.com")
+        g.addWidget(QLabel("Name"), 0, 0)
         g.addWidget(name, 0, 1)
-        g.addWidget(QLabel("E-mail"), 1, 0)
+        g.addWidget(QLabel("Email"), 1, 0)
         g.addWidget(email, 1, 1)
         return name, email, wrap
 
     def rebuild(self, couples: int, singles: int):
         self.clear()
 
-        couples_group = QGroupBox("Koppels")
+        couples_group = QGroupBox("Couples")
         couples_layout = QVBoxLayout(couples_group)
         for i in range(1, couples + 1):
             row = QWidget()
             row_layout = QHBoxLayout(row)
-            a_name, a_email, a_widget = self._make_person_row(f"Couple {i} – Persoon A")
-            b_name, b_email, b_widget = self._make_person_row(f"Couple {i} – Persoon B")
+            a_name, a_email, a_widget = self._make_person_row(f"Couple {i} – Person A")
+            b_name, b_email, b_widget = self._make_person_row(f"Couple {i} – Person B")
             row_layout.addWidget(a_widget)
             row_layout.addWidget(b_widget)
             couples_layout.addWidget(row)
             self.couple_rows.append([(a_name, a_email), (b_name, b_email)])
 
-        singles_group = QGroupBox("Aparte personen")
+        singles_group = QGroupBox("Singles")
         singles_layout = QVBoxLayout(singles_group)
         for i in range(1, singles + 1):
             s_name, s_email, s_widget = self._make_person_row(f"Single {i}")

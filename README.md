@@ -28,3 +28,5 @@ Each giver receives one email:
 Subject: Secret Santa
 
 Body: includes the name of their assigned recipient.
+
+Fancy to customize the email content? Edit the 'body' variable in `secretsanta/services/emailer.py`.

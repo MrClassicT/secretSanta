@@ -84,10 +84,10 @@ class MainWindow(QMainWindow):
 
         header_form = QFormLayout()
         header_form.setLabelAlignment(Qt.AlignRight)
-        header_form.addRow(QLabel("Aantal aparte personen:"), self.singles_spin)
-        header_form.addRow(QLabel("Aantal koppels:"), self.couples_spin)
+        header_form.addRow(QLabel("Number of singles:"), self.singles_spin)
+        header_form.addRow(QLabel("Number of couples:"), self.couples_spin)
 
-        self.build_btn = QPushButton("Build list")
+        self.build_btn = QPushButton("Create list")
         self.build_btn.clicked.connect(self._on_build_list)
 
         header_layout.addLayout(header_form, stretch=1)
@@ -97,7 +97,7 @@ class MainWindow(QMainWindow):
         self.names_panel = NamesPanel()
 
         # ===== Action & results =====
-        self.secret_btn = QPushButton("It's our little secret")
+        self.secret_btn = QPushButton("It's our little secret (shuffle)")
         self.secret_btn.setEnabled(False)
         self.secret_btn.clicked.connect(self._on_secret)
 
@@ -106,7 +106,7 @@ class MainWindow(QMainWindow):
         self.send_btn.clicked.connect(self._on_send_emails)
 
         self.results_table = QTableWidget(0, 2)
-        self.results_table.setHorizontalHeaderLabels(["Gever", "Ontvanger"])
+        self.results_table.setHorizontalHeaderLabels(["Giver", "Receiver"])
         self.results_table.horizontalHeader().setStretchLastSection(True)
         self.results_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         # Hide the table entirely in super secret mode
@@ -140,7 +140,7 @@ class MainWindow(QMainWindow):
         singles = self.singles_spin.value()
         total = 2 * couples + singles
         if total < 2:
-            QMessageBox.warning(self, "Not enough people", "Je hebt minstens 2 personen nodig.")
+            QMessageBox.warning(self, "Not enough people", "You need at least 2 people.")
             self.secret_btn.setEnabled(False)
             self.send_btn.setEnabled(False)
             return
@@ -159,7 +159,7 @@ class MainWindow(QMainWindow):
                 single_rows=self.names_panel.single_rows
             )
         except ValueError as e:
-            QMessageBox.warning(self, "Ongeldige invoer", str(e))
+            QMessageBox.warning(self, "Invalid input", str(e))
             return
         emails_enabled = len(emails) > 0
         secret_mode = _is_super_secret_mode()
@@ -167,8 +167,8 @@ class MainWindow(QMainWindow):
             # Secret mode cannot function without emails; fall back to normal mode.
             QMessageBox.information(
                 self,
-                "Secret mode uitgeschakeld",
-                "Secret mode vereist dat alle e-mailadressen ingevuld zijn. Omdat er geen e-mails zijn, wordt de verdeling getoond."
+                "Secret mode disabled",
+                "Secret mode requires all email addresses to be filled in. Since there are no emails, the assignment will be shown."
             )
             secret_mode = False
             if self.results_table.isHidden():
@@ -177,9 +177,9 @@ class MainWindow(QMainWindow):
         if assignment is None:
             QMessageBox.critical(
                 self,
-                "Geen geldige verdeling",
-                "Er kon geen geldige Secret Santa-verdeling gevonden worden met de huidige namen (rekening houdend met eerdere jaren).\n\n"
-                "Tip: voeg extra personen toe of verander de samenstelling, of wis history als dat acceptabel is."
+                "No valid assignment",
+                "No valid Secret Santa assignment could be found with the current names (taking previous years into account).\n\n"
+                "Tip: add extra people or change the composition, or clear history if that is acceptable."
             )
             self._last_assignment = None
             self.send_btn.setEnabled(False)
@@ -193,7 +193,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self,
                 "Super secret mode",
-                "De verdeling is gemaakt en opgeslagen, maar wordt niet getoond. Klik 'Send emails' om de e-mails te versturen."
+                "The assignment has been made and saved, but is not shown. Click 'Send emails' to send the emails."
             )
             self.results_table.setRowCount(0)
             self.send_btn.setEnabled(True)  # emails_enabled must be True here
@@ -208,7 +208,7 @@ class MainWindow(QMainWindow):
 
     def _on_send_emails(self):
         if not self._last_assignment or not self._last_emails:
-            QMessageBox.information(self, "Geen verdeling", "Maak eerst een verdeling.")
+            QMessageBox.information(self, "No assignment", "Create an assignment first.")
             return
 
         try:
@@ -225,13 +225,13 @@ class MainWindow(QMainWindow):
                 dry_run=False
             )
         except Exception as e:
-            QMessageBox.critical(self, "Verzenden mislukt", f"Fout tijdens verzenden: {e}")
+            QMessageBox.critical(self, "Sending failed", f"Error during sending: {e}")
             return
 
         QMessageBox.information(
             self,
-            "E-mails verzonden",
-            f"E-mails verzonden naar {len(sent)} deelnemers."
+            "Emails sent",
+            f"Emails sent to {len(sent)} participants."
         )
 
 
