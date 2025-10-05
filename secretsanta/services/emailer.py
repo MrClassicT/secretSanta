@@ -74,7 +74,7 @@ def send_secret_santa_emails(
             f"Santa told me that you get to choose something nice for {receiver.capitalize()} this year!\n\n"
             "Be original and keep it a secret! 😉\n\n"
             "Best regards,\n"
-            "The Super Secret Santa Elfs Committee"
+            "The Super Secret Santa Elves Committee"
         )
         msg.set_content(body)
         messages.append(msg)
