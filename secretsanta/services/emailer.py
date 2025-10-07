@@ -52,23 +52,20 @@ def send_secret_santa_emails(
     dry_run: bool = False
 ) -> List[Tuple[str, str]]:
     """
-    Sends one email per giver with the receiver's name in the body.
-    Returns a list of (giver, recipient_email) that were attempted/sent.
+    Sends one email per giver that has an email present.
+    Skips givers without an email silently (new behavior).
+    Returns a list of (giver, recipient_email) actually sent/attempted.
     """
     attempted: List[Tuple[str, str]] = []
-
-    # Build messages first to fail fast on missing emails
     messages: List[EmailMessage] = []
     for giver, receiver in assignment.items():
-        if giver not in emails:
-            raise ValueError(f"Geen e-mail gevonden voor '{giver}'.")
-        to_addr = emails[giver]
-
+        to_addr = emails.get(giver)
+        if not to_addr:
+            continue  # skip silently
         msg = EmailMessage()
         msg["Subject"] = "Secret Santa"
         msg["From"] = _format_sender(settings)
         msg["To"] = to_addr
-
         body = (
             f"Hey {giver.capitalize()},\n\n"
             f"De kerstman heeft me verteld dat jij dit jaar voor {receiver.capitalize()} iets leuks mag uitkiezen!\n\n"
@@ -79,14 +76,11 @@ def send_secret_santa_emails(
         msg.set_content(body)
         messages.append(msg)
         attempted.append((giver, to_addr))
-
     if dry_run:
         return attempted
-
     context = ssl.create_default_context()
     with smtplib.SMTP_SSL(settings.host, settings.port, context=context) as server:
         server.login(settings.username, settings.password)
         for msg in messages:
             server.send_message(msg)
-
     return attempted
