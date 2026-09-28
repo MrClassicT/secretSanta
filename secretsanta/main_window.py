@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QFormLayout, QLabel, QSpinBox, QPushButton, QTableWidget,
-    QTableWidgetItem, QMessageBox, QSizePolicy
+    QTableWidgetItem, QMessageBox, QSizePolicy, QInputDialog
 )
 
 from .widgets.names_panel import NamesPanel
@@ -79,6 +79,21 @@ def _load_latest_entry() -> tuple[dict[str, str], dict[str, str]] | None:
     return pairs, emails
 
 
+def _update_latest_entry_emails(emails: dict[str, str]) -> None:
+    if not HISTORY_INDEX_FILE.exists():
+        return
+    try:
+        data = json.loads(HISTORY_INDEX_FILE.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"Failed to parse history index for email update: {e}")
+        return
+    assignments = data.get("assignments", [])
+    if not assignments:
+        return
+    assignments[-1]["emails"] = emails
+    HISTORY_INDEX_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -123,6 +138,10 @@ class MainWindow(QMainWindow):
         self.send_btn.setEnabled(False)
         self.send_btn.clicked.connect(self._on_send_emails)
 
+        self.fix_one_btn = QPushButton("Fix one email")
+        self.fix_one_btn.setEnabled(False)
+        self.fix_one_btn.clicked.connect(self._on_fix_one_email)
+
         self.results_table = QTableWidget(0, 2)
         self.results_table.setHorizontalHeaderLabels(["Gever", "Ontvanger"])
         self.results_table.horizontalHeader().setStretchLastSection(True)
@@ -141,6 +160,7 @@ class MainWindow(QMainWindow):
         actions_l = QHBoxLayout(actions)
         actions_l.addWidget(self.secret_btn)
         actions_l.addWidget(self.send_btn)
+        actions_l.addWidget(self.fix_one_btn)
         actions_l.addWidget(self.load_last_btn)
         actions_l.addStretch(1)
 
@@ -164,6 +184,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Not enough people", "Je hebt minstens 2 personen nodig.")
             self.secret_btn.setEnabled(False)
             self.send_btn.setEnabled(False)
+            self.fix_one_btn.setEnabled(False)
             return
         self.results_table.setRowCount(0)
         self._last_assignment = None
@@ -171,6 +192,7 @@ class MainWindow(QMainWindow):
         self.names_panel.rebuild(couples=couples, singles=singles)
         self.secret_btn.setEnabled(True)
         self.send_btn.setEnabled(False)
+        self.fix_one_btn.setEnabled(False)
         self._email_change_connected = False  # reset so we can reconnect for new edits
 
     # Helper to attach change listeners to all email fields once
@@ -207,16 +229,43 @@ class MainWindow(QMainWindow):
                     any_valid = True
                     break
         self.send_btn.setEnabled(any_valid)
+        self.fix_one_btn.setEnabled(any_valid)
         # Update cached emails progressively (optional)
         if any_valid:
             try:
-                people, partner_of, emails = collect_participants_or_raise(
-                    couple_rows=self.names_panel.couple_rows,
-                    single_rows=self.names_panel.single_rows
-                )
+                emails = self._collect_current_emails()
                 self._last_emails = emails
             except Exception:
                 pass
+
+    def _collect_current_emails(self) -> dict[str, str]:
+        people, _partner_of, emails = collect_participants_or_raise(
+            couple_rows=self.names_panel.couple_rows,
+            single_rows=self.names_panel.single_rows
+        )
+        if self._last_assignment and set(people) != set(self._last_assignment.keys()):
+            raise ValueError("Je kunt de namen niet wijzigen nadat een trekking is gemaakt of geladen.")
+        return emails
+
+    def _prepare_emails_for_sending(self) -> dict[str, str] | None:
+        try:
+            emails = self._collect_current_emails()
+        except ValueError as e:
+            QMessageBox.warning(self, "Ongeldige invoer", str(e))
+            return None
+        if len(emails) == 0:
+            QMessageBox.information(self, "Geen e-mails", "Voeg e-mailadressen toe bij de deelnemers die je wil mailen.")
+            return None
+        self._last_emails = emails
+        _update_latest_entry_emails(emails)
+        return emails
+
+    def _load_smtp_settings(self) -> SMTPSettings | None:
+        try:
+            return load_smtp_settings_from_env()
+        except Exception as e:
+            QMessageBox.critical(self, "SMTP-configuratiefout", str(e))
+            return None
 
     def _on_secret(self):
         # If we were in reuse mode and user clicks secret, exit reuse mode
@@ -256,6 +305,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Super secret mode", msg)
             self.results_table.setRowCount(0)
             self.send_btn.setEnabled(emails_enabled)
+            self.fix_one_btn.setEnabled(emails_enabled)
         else:
             self.results_table.setRowCount(len(assignment))
             for row, giver in enumerate(people):
@@ -264,6 +314,7 @@ class MainWindow(QMainWindow):
             self.results_table.resizeColumnsToContents()
             self.results_table.horizontalHeader().setStretchLastSection(True)
             self.send_btn.setEnabled(True)
+            self.fix_one_btn.setEnabled(True)
 
     def _on_load_last(self):
         latest = _load_latest_entry()
@@ -289,6 +340,7 @@ class MainWindow(QMainWindow):
             msg = "Laatste trekking geladen. Vul e-mails aan (geen e-mails bekend)." if len(emails) == 0 else "Laatste trekking geladen. Klik 'Send emails' om opnieuw te versturen of pas e-mails aan."
             QMessageBox.information(self, "Super secret mode", msg)
             self.send_btn.setEnabled(len(emails) > 0)
+            self.fix_one_btn.setEnabled(len(assignment) > 0)
         else:
             if self.results_table.isHidden():
                 self.results_table.show()
@@ -299,42 +351,23 @@ class MainWindow(QMainWindow):
             self.results_table.resizeColumnsToContents()
             self.results_table.horizontalHeader().setStretchLastSection(True)
             self.send_btn.setEnabled(True)
+            self.fix_one_btn.setEnabled(True)
         self.secret_btn.setEnabled(True)
 
     def _on_send_emails(self):
-        # If in reuse mode, refresh emails from fields (allow edits)
-        if self._reuse_mode:
-            try:
-                people, partner_of, emails = collect_participants_or_raise(
-                    couple_rows=self.names_panel.couple_rows,
-                    single_rows=self.names_panel.single_rows
-                )
-            except ValueError as e:
-                QMessageBox.warning(self, "Ongeldige invoer", str(e))
-                return
-            if len(emails) == 0:
-                QMessageBox.information(self, "Geen e-mails", "Vul minstens één e-mailadres in om iets te kunnen verzenden.")
-                return
-            if set(people) != set(self._last_assignment.keys()):
-                QMessageBox.critical(self, "Namen gewijzigd", "Je kunt de namen niet wijzigen bij hergebruik van een trekking.")
-                return
-            self._last_emails = emails
         if not self._last_assignment:
             QMessageBox.information(self, "Geen verdeling", "Maak of laad eerst een verdeling.")
             return
-        if not self._last_emails or len(self._last_emails) == 0:
-            QMessageBox.information(self, "Geen e-mails", "Voeg e-mailadressen toe bij de deelnemers die je wil mailen.")
+        emails = self._prepare_emails_for_sending()
+        if emails is None:
             return
-        # Send only to those with email (handled by emailer)
-        try:
-            settings: SMTPSettings = load_smtp_settings_from_env()
-        except Exception as e:
-            QMessageBox.critical(self, "SMTP-configuratiefout", str(e))
+        settings = self._load_smtp_settings()
+        if settings is None:
             return
         try:
             sent = send_secret_santa_emails(
                 assignment=self._last_assignment,
-                emails=self._last_emails,
+                emails=emails,
                 settings=settings,
                 dry_run=False
             )
@@ -345,6 +378,50 @@ class MainWindow(QMainWindow):
             self,
             "E-mails verzonden",
             f"E-mails verzonden naar {len(sent)} deelnemers met een ingevuld e-mailadres."
+        )
+
+    def _on_fix_one_email(self):
+        if not self._last_assignment:
+            QMessageBox.information(self, "Geen verdeling", "Maak of laad eerst een verdeling.")
+            return
+        emails = self._prepare_emails_for_sending()
+        if emails is None:
+            return
+        eligible_givers = [giver for giver in self._last_assignment if emails.get(giver)]
+        if not eligible_givers:
+            QMessageBox.information(self, "Geen e-mails", "Er is geen deelnemer met een ingevuld e-mailadres om te corrigeren.")
+            return
+        giver, accepted = QInputDialog.getItem(
+            self,
+            "Corrigeer één e-mail",
+            "Kies voor wie je opnieuw wil verzenden:",
+            eligible_givers,
+            0,
+            False,
+        )
+        if not accepted or not giver:
+            return
+        settings = self._load_smtp_settings()
+        if settings is None:
+            return
+        try:
+            sent = send_secret_santa_emails(
+                assignment=self._last_assignment,
+                emails=emails,
+                settings=settings,
+                dry_run=False,
+                giver_names=[giver],
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Verzenden mislukt", f"Fout tijdens verzenden: {e}")
+            return
+        if not sent:
+            QMessageBox.information(self, "Niet verzonden", f"Er werd geen e-mail verzonden voor {giver}. Controleer het e-mailadres.")
+            return
+        QMessageBox.information(
+            self,
+            "Correctiemail verzonden",
+            f"De correctiemail voor {giver} is verzonden naar {emails[giver]}."
         )
 
 

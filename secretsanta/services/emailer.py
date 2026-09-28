@@ -3,7 +3,7 @@ import ssl
 import smtplib
 from dataclasses import dataclass
 from email.message import EmailMessage
-from typing import Dict, List, Tuple
+from typing import Dict, Iterable, List, Tuple
 
 from dotenv import load_dotenv
 
@@ -49,7 +49,8 @@ def send_secret_santa_emails(
     assignment: Dict[str, str],
     emails: Dict[str, str],
     settings: SMTPSettings,
-    dry_run: bool = False
+    dry_run: bool = False,
+    giver_names: Iterable[str] | None = None,
 ) -> List[Tuple[str, str]]:
     """
     Sends one email per giver that has an email present.
@@ -58,7 +59,10 @@ def send_secret_santa_emails(
     """
     attempted: List[Tuple[str, str]] = []
     messages: List[EmailMessage] = []
+    allowed_givers = set(giver_names) if giver_names is not None else None
     for giver, receiver in assignment.items():
+        if allowed_givers is not None and giver not in allowed_givers:
+            continue
         to_addr = emails.get(giver)
         if not to_addr:
             continue  # skip silently

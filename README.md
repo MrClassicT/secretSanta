@@ -25,6 +25,8 @@ python main.py
 
 Run the app, enter names and emails, draw the pairs via "It’s our little secret", then click "Send emails".
 
+If one address was wrong after sending, use "Load last draw" to restore the latest assignment, correct the email field, then use "Fix one email" to resend only that participant's mail. The corrected address is also saved back into the latest history entry.
+
 Each giver receives **one email**:
 
 ---
