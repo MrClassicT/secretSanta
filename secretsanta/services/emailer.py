@@ -71,7 +71,7 @@ def send_secret_santa_emails(
             f"De kerstman heeft me verteld dat jij dit jaar voor {receiver.capitalize()} iets leuks mag uitkiezen!\n\n"
             "Wees origineel en mondje toe hé! 😉\n\n"
             "Groetjes,\n"
-            "De Super Secret Santa Elfen Commissie"
+            "De Super Secret Santa Elven Commissie"
         )
         msg.set_content(body)
         messages.append(msg)
